@@ -1,5 +1,6 @@
 import { exec } from 'child_process'
 import * as WebSocket from 'ws';
+//import * as https from 'https';
 import { glob } from 'glob';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -163,12 +164,12 @@ export class CommandExecutorServer {
 
     constructor(
         private wsServer: WebSocket.Server
+
     ) {
         console.log(wsServer.address());
         console.log('WebSocket server is listening on port ' + wsServer.address()["port"].toString());
         wsServer.on('connection', websocket => {
             let ws: CommandExecutorSocket = new CommandExecutorSocket(websocket);
         });
-
     }
 }
