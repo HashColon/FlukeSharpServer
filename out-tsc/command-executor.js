@@ -26,6 +26,8 @@ var glob_1 = require("glob");
 var path = __importStar(require("path"));
 var fs = __importStar(require("fs"));
 var flukesharp_message_1 = require("./flukesharp-message");
+// define home dir 
+var homeDir = "/home/cadit/WTK/FelineExp";
 var CommandExecutorSocket = /** @class */ (function () {
     function CommandExecutorSocket(wsSocket) {
         var _this = this;
@@ -55,6 +57,12 @@ var CommandExecutorSocket = /** @class */ (function () {
             }
         });
     }
+    CommandExecutorSocket.prototype.path = function (pathWithoutHome) {
+        return homeDir + '/' + pathWithoutHome;
+    };
+    CommandExecutorSocket.prototype.outpath = function (path) {
+        return path.replace(homeDir + '/', '');
+    };
     CommandExecutorSocket.prototype.InvalidMessageReturn = function (key, cmd, msg) {
         if (msg === void 0) { msg = "Invalid message."; }
         console.error('Invalid message received: \n' + JSON.stringify(cmd));
@@ -77,9 +85,10 @@ var CommandExecutorSocket = /** @class */ (function () {
             var geojsons = [];
             for (var _i = 0, _a = msg.filepaths; _i < _a.length; _i++) {
                 var afile = _a[_i];
+                var afileR = this.path(afile);
                 geojsons.push({
-                    filename: path.basename(afile),
-                    geojson: fs.readFileSync(afile).toString()
+                    filename: path.basename(afileR),
+                    geojson: fs.readFileSync(afileR).toString()
                 });
             }
             this.wsSocket.send(JSON.stringify({
@@ -94,14 +103,16 @@ var CommandExecutorSocket = /** @class */ (function () {
         }
     };
     CommandExecutorSocket.prototype.request_dirlist = function (key, msg) {
+        var _this = this;
         try {
             var root = msg.root.endsWith('/') ? msg.root.slice(0, -1) : msg.root;
+            root = this.path(root);
             this.wsSocket.send(JSON.stringify({
                 messageKey: key,
                 messageType: flukesharp_message_1.FlukeSharpMessageType.return,
                 messageContent: fs.readdirSync(root, { withFileTypes: true })
                     .filter(function (item) { return item.isDirectory(); })
-                    .map(function (item) { return (root + "/" + item.name); })
+                    .map(function (item) { return _this.outpath(root + "/" + item.name); })
             }));
             console.log('Return message of req_dirlist returned.');
         }
@@ -111,7 +122,10 @@ var CommandExecutorSocket = /** @class */ (function () {
     };
     CommandExecutorSocket.prototype.request_filelist = function (key, msg) {
         var _this = this;
-        var globmsg = msg.root + '/*' + (msg.recursive ? '*/*' : '') + msg.extension;
+        console.log(JSON.stringify(msg));
+        var root = this.path(msg.root);
+        console.log(root);
+        var globmsg = root + '/*' + (msg.recursive ? '*/*' : '') + msg.extension;
         if (msg.globoptions) {
             glob_1.glob(globmsg, msg.globoptions, function (error, files) {
                 if (error) {
@@ -121,7 +135,7 @@ var CommandExecutorSocket = /** @class */ (function () {
                     messageKey: key,
                     messageType: flukesharp_message_1.FlukeSharpMessageType.return,
                     messageContent: files.map(function (file) {
-                        return path.relative(msg.root, file);
+                        return path.relative(root, file);
                     })
                 }));
                 console.log('Return message of req_filelist returned.');
@@ -132,11 +146,18 @@ var CommandExecutorSocket = /** @class */ (function () {
                 if (error) {
                     _this.ErrorMessageReturn(key, error);
                 }
+                console.log(JSON.stringify({
+                    messageKey: key,
+                    messageType: flukesharp_message_1.FlukeSharpMessageType.return,
+                    messageContent: files.map(function (file) {
+                        return path.relative(root, file);
+                    })
+                }));
                 _this.wsSocket.send(JSON.stringify({
                     messageKey: key,
                     messageType: flukesharp_message_1.FlukeSharpMessageType.return,
                     messageContent: files.map(function (file) {
-                        return path.relative(msg.root, file);
+                        return path.relative(root, file);
                     })
                 }));
                 console.log('Return message of req_filelist returned.');

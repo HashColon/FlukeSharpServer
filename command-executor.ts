@@ -8,7 +8,17 @@ import * as fs from 'fs';
 import { FlukeSharpMessage, FlukeSharpMessageType } from './flukesharp-message';
 import { strict } from 'assert';
 
+// define home dir 
+var homeDir = "/home/cadit/WTK/FelineExp";
+
 export class CommandExecutorSocket {
+
+    path(pathWithoutHome: string) {
+        return homeDir + '/' + pathWithoutHome;
+    }
+    outpath(path: string) {
+        return path.replace(homeDir + '/', '');
+    }
 
     InvalidMessageReturn(key: string, cmd, msg: string = "Invalid message."): void {
         console.error('Invalid message received: \n' + JSON.stringify(cmd));
@@ -62,9 +72,10 @@ export class CommandExecutorSocket {
         try {
             var geojsons: { filename: string, geojson: string }[] = [];
             for (var afile of msg.filepaths) {
+                let afileR = this.path(afile);
                 geojsons.push({
-                    filename: path.basename(afile),
-                    geojson: fs.readFileSync(afile).toString()
+                    filename: path.basename(afileR),
+                    geojson: fs.readFileSync(afileR).toString()
                 });
             }
 
@@ -82,6 +93,7 @@ export class CommandExecutorSocket {
     request_dirlist(key: string, msg: any) {
         try {
             var root = msg.root.endsWith('/') ? msg.root.slice(0, -1) : msg.root;
+            root = this.path(root);
             this.wsSocket.send(
                 JSON.stringify({
                     messageKey: key,
@@ -89,14 +101,17 @@ export class CommandExecutorSocket {
                     messageContent:
                         fs.readdirSync(root, { withFileTypes: true })
                             .filter(item => item.isDirectory())
-                            .map(item => (root + "/" + item.name))
+                            .map(item => this.outpath(root + "/" + item.name))
                 }));
             console.log('Return message of req_dirlist returned.');
         } catch (e) { this.ErrorMessageReturn(key, e); }
     }
 
     request_filelist(key: string, msg: any) {
-        var globmsg = msg.root + '/*' + (msg.recursive ? '*/*' : '') + msg.extension;
+        console.log(JSON.stringify(msg));
+        var root = this.path(msg.root);
+        console.log(root);
+        var globmsg = root + '/*' + (msg.recursive ? '*/*' : '') + msg.extension;
 
         if (msg.globoptions) {
             glob(globmsg, msg.globoptions, (error, files) => {
@@ -107,7 +122,7 @@ export class CommandExecutorSocket {
                     messageKey: key,
                     messageType: FlukeSharpMessageType.return,
                     messageContent: files.map(file => {
-                        return path.relative(msg.root, file);
+                        return path.relative(root, file);
                     })
                 }));
                 console.log('Return message of req_filelist returned.');
@@ -118,11 +133,20 @@ export class CommandExecutorSocket {
                 if (error) {
                     this.ErrorMessageReturn(key, error);
                 }
+                console.log(
+                    JSON.stringify({
+                        messageKey: key,
+                        messageType: FlukeSharpMessageType.return,
+                        messageContent: files.map(file => {
+                            return path.relative(root, file);
+                        })
+                    })
+                );
                 this.wsSocket.send(JSON.stringify({
                     messageKey: key,
                     messageType: FlukeSharpMessageType.return,
                     messageContent: files.map(file => {
-                        return path.relative(msg.root, file);
+                        return path.relative(root, file);
                     })
                 }));
                 console.log('Return message of req_filelist returned.');
